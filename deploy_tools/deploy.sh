@@ -23,7 +23,7 @@ _get_latest_source () {
 
 _build_mvapi () {
     { 
-	echo DJANGO_DEBUG=on
+	echo DJANGO_DEBUG=off
 	echo DJANGO_SECRET_KEY=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c50)
         echo DJANGO_ALLOWED_HOSTS=localhost
     } >> .env
