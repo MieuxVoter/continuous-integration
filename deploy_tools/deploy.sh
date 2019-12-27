@@ -27,19 +27,17 @@ _build_mvapi () {
 	echo DJANGO_SECRET_KEY=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c50)
         echo DJANGO_ALLOWED_HOSTS=localhost
     } >> .env
-    sudo ./build.sh
     sudo docker-compose up -d
-    sudo ./migrate.sh
-    # docker exec -it mvapi_web_1 python manage.py collectstatic --noinput
 }
 
 
 _build_mvfront_react() {
-    npm install
-    npm run build
-    sudo npm install serve
-    serve -s build -l 3000 &
-    echo $! > mvfront_react.pidfile
+    yarn install
+    yarn add serve
+    echo "REACT_APP_SERVER_URL=/api/" >> .env.local
+    yarn build
+    serve -s build -l tcp://localhost:3000 &
+    echo $! > serve.pidfile
 }
 
 

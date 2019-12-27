@@ -9,6 +9,7 @@ pushd $DEFAULT_SITE/mvapi
 popd
 
 pushd $DEFAULT_SITE/mvfront_react
-	pid=$(cat mvfront_react.pidfile)
+	pid=$(cat serve.pidfile)
 	kill $pid
+	rm serve.pidfile
 popd
