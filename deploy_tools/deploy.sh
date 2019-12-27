@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-MV_GITHUB=https://github.com/MieuxVoter/
-DEFAULT_SITE=$HOME/sites/
-echo "DEPLOYING on $DEFAULT_SITE"
+REPO=${REPO:-https://github.com/MieuxVoter/}
+SITES_FOLDER=${SITES_FOLDER:-HOME/sites/}
+SERVER_HOSTNAME=${SERVER_HOSTNAME:-demo.mieuxvoter.fr}
+HTTPS=true
+echo "DEPLOYING FROM $SITES_FOLDER ON ${SERVER_HOSTNAME}"
 
 
 _get_latest_source () {
@@ -10,14 +12,15 @@ _get_latest_source () {
     # * repo: name of the repo
     repo=$1
 
+    current_commit=$(git log -n 1 --format=%H)
+    git reset --hard ${current_commit}
+
     if [ -d ".git" ]; then
-        git fetch
+        git pull
     else
         git clone ${MV_GITHUB}${repo} .
     fi
 
-    current_commit=$(git log -n 1 --format=%H)
-    git reset --hard ${current_commit}
 }
 
 
@@ -28,15 +31,17 @@ _build_mvapi () {
         echo DJANGO_ALLOWED_HOSTS=localhost
     } >> .env
     sudo docker-compose up -d
+    sudo docker/migrate.sh
 }
 
 
 _build_mvfront_react() {
-    yarn install
-    yarn add serve
-    echo "REACT_APP_SERVER_URL=/api/" >> .env.local
-    yarn build
-    serve -s build -l tcp://localhost:3000 &
+    echo "REACT_APP_SERVER_URL=/api/" >> .env.local 
+    yarn install && \
+	yarn global add serve && \
+	yarn upgrade && \
+	yarn build && \
+	{ $(yarn global bin)/serve -s build -l tcp://localhost:3000 & }
     echo $! > serve.pidfile
 }
 
@@ -56,7 +61,7 @@ _build () {
 
 deploy () {
     repo=$1
-    site_folder=${DEFAULT_SITE}${repo}
+    site_folder=${SITES_FOLDER}${repo}
     mkdir -p $site_folder
 
     pushd $site_folder
@@ -67,13 +72,24 @@ deploy () {
 }
 
 
+setup_nginx () {
+	DIR=$(dirname $(dirname "$(readlink -f "$0")"))
+	if [ "$HTTP" = true ]; then
+		sudo cp $DIR/nginx/http-template.conf /etc/nginx/sites-enabled/${SERVER_HOSTNAME}.conf
+	else
+		sudo cp $DIR/nginx/https-template.conf /etc/nginx/sites-enabled/${SERVER_HOSTNAME}.conf
+	fi
+
+	sudo sed -i "s/HOSTNAME/${SERVER_HOSTNAME}/g" /etc/nginx/sites-enabled/${SERVER_HOSTNAME}.conf
+	sudo nginx -s reload
+}
+
+
 echo "DEPLOYING MVAPI"
-deploy mvapi
+# deploy mvapi
 
 echo "DEPLOYING MVFRONT-REACT"
-deploy mvfront-react
+# deploy mvfront-react
 
 echo "DEPLOYING NGINX WITH HTTP"
-DIR=$(dirname "$(readlink -f "$0")")
-sudo ln -s $DIR/nginx/http-template.conf /etc/nginx/sites-enabled/
-/etc/init.d/nginx restart
+setup_nginx
